@@ -7,6 +7,7 @@ import speakeasy from 'speakeasy'
 import { auth } from '@/auth'
 import type { ActionResult } from '@/lib/action-result'
 import { prisma } from '@/lib/prisma'
+import { encryptTwoFactorSecret } from '@/lib/two-factor-crypto'
 import {
   disableTwoFactorSchema,
   enableTwoFactorSchema,
@@ -14,65 +15,6 @@ import {
   type EnableTwoFactorInput,
 } from '@/lib/validation/two-factor'
 
-function bufferToHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-async function encryptSecret(secret: string): Promise<{ encrypted: string; iv: string; authTag: string }> {
-  const encoder = new TextEncoder()
-
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(process.env.AUTH_SECRET || ''),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  )
-
-  const salt = encoder.encode('salt')
-  const key = await crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt,
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    {
-      name: 'AES-GCM',
-      length: 256,
-    },
-    false,
-    ['encrypt']
-  )
-
-  const iv = new Uint8Array(16)
-  crypto.getRandomValues(iv)
-
-  const encryptedBuffer = await crypto.subtle.encrypt(
-    {
-      name: 'AES-GCM',
-      iv,
-    },
-    key,
-    encoder.encode(secret)
-  )
-
-  const encryptedArray = new Uint8Array(encryptedBuffer)
-  const authTagLength = 16
-  const ciphertextLength = encryptedArray.length - authTagLength
-
-  const ciphertext = encryptedArray.slice(0, ciphertextLength)
-  const authTag = encryptedArray.slice(ciphertextLength)
-
-  return {
-    encrypted: bufferToHex(ciphertext.buffer),
-    iv: bufferToHex(iv.buffer),
-    authTag: bufferToHex(authTag.buffer),
-  }
-}
 
 export async function setupTwoFactorAction(): Promise<ActionResult<{ secret: string; qrCode: string }>> {
   try {
@@ -145,7 +87,7 @@ export async function enableTwoFactorAction(
       }
     }
 
-    const { encrypted, iv, authTag } = await encryptSecret(parsed.data.secret)
+    const { encrypted, iv, authTag } = await encryptTwoFactorSecret(parsed.data.secret)
     const encryptedSecret = `${encrypted}:${iv}:${authTag}`
 
     await prisma.user.update({

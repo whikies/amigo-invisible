@@ -37,14 +37,24 @@ function LoginForm() {
     setError('')
     setLoading(true)
 
-    const formData = new FormData(event.currentTarget)
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-
-    console.log('🔐 Login attempt:', { email, password: '***' })
-
     try {
-      // Primero verificar si requiere 2FA
+      let email: string
+      let password: string
+
+      // Si estamos en modo 2FA, usar credenciales guardadas
+      // Si no, leer del formulario
+      if (requires2FA) {
+        email = credentials.email
+        password = credentials.password
+        console.log('🔐 2FA attempt:', { email, password: '***', twoFactorCode: '***' })
+      } else {
+        const formData = new FormData(event.currentTarget)
+        email = formData.get('email') as string
+        password = formData.get('password') as string
+        console.log('🔐 Login attempt:', { email, password: '***' })
+      }
+
+      // Si NO estamos en modo 2FA, verificar si se requiere
       if (!requires2FA) {
         const checkResult = await checkTwoFactorRequirementAction({ email, password })
 
@@ -55,37 +65,49 @@ function LoginForm() {
         }
 
         if (checkResult.data?.requires2FA) {
-          // Usuario requiere 2FA, mostrar campo
-          setRequires2FA(true)
+          // Usuario requiere 2FA, guardar credenciales y mostrar campo
           setCredentials({ email, password })
+          setRequires2FA(true)
           setLoading(false)
           return
         }
       }
 
       // Intentar login (con o sin 2FA)
-      console.log('Calling signIn...')
+      console.log('Calling signIn...', { requiresCode: requires2FA })
       const result = await signIn('credentials', {
-        email: requires2FA ? credentials.email : email,
-        password: requires2FA ? credentials.password : password,
+        email,
+        password,
         twoFactorToken: requires2FA ? twoFactorCode : undefined,
         redirect: false
       })
+
+      console.log({
+        email,
+        password,
+        twoFactorToken: requires2FA ? twoFactorCode : undefined,
+        redirect: false
+      });
+
+      console.log(result);
 
       console.log('SignIn result:', result)
 
       if (result?.error) {
         console.error('Login error:', result.error)
 
-        if (result.error === '2FA_REQUIRED') {
-          setError('Se requiere código 2FA')
-        } else if (result.error === 'INVALID_2FA_TOKEN') {
-          setError('Código 2FA inválido o expirado')
-          setTwoFactorCode('')
+        // NextAuth los convierte en CredentialsSignin, necesitamos verificar en el catch
+        if (result.error === 'CredentialsSignin' || result.error === 'Invalid credentials') {
+          // Si estamos en 2FA, es un código inválido. Si no, credenciales inválidas
+          if (requires2FA) {
+            setError('Código 2FA inválido o expirado')
+            setTwoFactorCode('')
+          } else {
+            setError('Email o contraseña incorrectos')
+          }
         } else {
-          setError('Email o contraseña incorrectos')
-          setRequires2FA(false)
-          setTwoFactorCode('')
+          console.warn('Unhandled error:', result.error)
+          setError('Error al iniciar sesión')
         }
       } else if (result?.ok) {
         console.log('Login successful, redirecting...')

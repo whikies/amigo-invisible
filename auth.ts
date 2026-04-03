@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { decryptTwoFactorSecret } from '@/lib/two-factor-crypto'
 
 // Tipos extendidos para el usuario
 interface ExtendedUser {
@@ -50,31 +51,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (user.twoFactorEnabled) {
           const twoFactorToken = credentials.twoFactorToken as string | undefined
 
+          // Si falta 2FA, no debería pasar aquí porque ya lo validamos
+          // pero si llega, simplemente rechazamos
           if (!twoFactorToken) {
-            // Credenciales correctas pero falta 2FA
-            throw new Error('2FA_REQUIRED')
+            console.warn('2FA token missing but twoFactorEnabled=true')
+            return null
           }
 
           // Verificar el código 2FA
           if (!user.twoFactorSecret) {
-            throw new Error('2FA_NOT_CONFIGURED')
+            console.error('2FA enabled but secret not configured')
+            return null
           }
 
           // Descifrar y verificar el token
-          const crypto = await import('crypto')
           const speakeasy = await import('speakeasy')
 
           try {
-            const [encrypted, ivHex, authTagHex] = user.twoFactorSecret.split(':')
-            const key = crypto.scryptSync(process.env.AUTH_SECRET || '', 'salt', 32)
-            const iv = Buffer.from(ivHex, 'hex')
-            const authTag = Buffer.from(authTagHex, 'hex')
-
-            const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
-            decipher.setAuthTag(authTag)
-
-            let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-            decrypted += decipher.final('utf8')
+            const decrypted = await decryptTwoFactorSecret(user.twoFactorSecret)
 
             const verified = speakeasy.totp.verify({
               secret: decrypted,
@@ -84,11 +78,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             })
 
             if (!verified) {
-              throw new Error('INVALID_2FA_TOKEN')
+              console.warn('2FA token verification failed')
+              return null
             }
           } catch (error) {
             console.error('2FA verification error:', error)
-            throw new Error('INVALID_2FA_TOKEN')
+            return null
           }
         }
 

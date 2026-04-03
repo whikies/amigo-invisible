@@ -1,0 +1,227 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  name          String
+  password      String    // Hash bcrypt de la contraseña
+  role          String    @default("user") // "user" o "admin"
+  emailVerified DateTime? // Fecha de verificación de email
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Campos de 2FA
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String? // Secret de TOTP cifrado
+
+  // Relaciones
+  exclusionsFrom UserExclusion[]  @relation("ExclusionFrom")
+  exclusionsTo   UserExclusion[]  @relation("ExclusionTo")
+  assignments    Assignment[]     @relation("UserAssignments")
+  events         EventParticipant[]
+  notifications  Notification[]
+  verificationTokens VerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+  wishLists      WishList[]
+  messagesSent   Message[]        @relation("SenderMessages")
+  messagesReceived Message[]      @relation("ReceiverMessages")
+  invitationsSent Invitation[]    @relation("SentInvitations")
+
+  @@index([email])
+  @@index([role])
+}
+
+// Relaciones de exclusión (parejas, familiares, etc.)
+model UserExclusion {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  excludedUserId Int
+  reason    String?  // "pareja", "familia", "hermanos", etc.
+  createdAt DateTime @default(now())
+
+  user         User @relation("ExclusionFrom", fields: [userId], references: [id], onDelete: Cascade)
+  excludedUser User @relation("ExclusionTo", fields: [excludedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, excludedUserId])
+  @@index([userId])
+  @@index([excludedUserId])
+}
+
+// Evento/Sorteo de amigo invisible
+model Event {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  year        Int
+  drawDate    DateTime? // Fecha en que se realiza el sorteo
+  eventDate   DateTime? // Fecha del intercambio de regalos
+  isActive    Boolean  @default(true)
+  isDrawn     Boolean  @default(false) // Si ya se realizó el sorteo
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants EventParticipant[]
+  assignments  Assignment[]
+  wishLists    WishList[]
+  messages     Message[]
+
+  @@index([year])
+  @@index([isActive])
+}
+
+// Participantes en un evento
+model EventParticipant {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  userId    Int
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+// Asignaciones cifradas del sorteo
+model Assignment {
+  id                    Int      @id @default(autoincrement())
+  eventId               Int
+  userId                Int      // Usuario que regala
+  encryptedAssignedTo   String   // ID del usuario asignado CIFRADO con la contraseña del usuario
+  iv                    String   // Vector de inicialización para el cifrado AES
+  salt                  String   // Salt único para derivar la clave de cifrado
+  authTag               String   // Tag de autenticación para AES-GCM
+  createdAt             DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation("UserAssignments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+// Notificaciones in-app
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String   // "sorteo", "recordatorio", "invitacion", "sistema"
+  title     String
+  message   String
+  link      String?  // URL a la que redirige la notificación
+  isRead    Boolean  @default(false)
+  eventId   Int?     // ID del evento relacionado (opcional)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// Tokens de verificación de email
+model VerificationToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// Tokens de recuperación de contraseña
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// Lista de deseos/hints para regalo
+model WishList {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  eventId     Int
+  item        String   // Descripción del regalo/hint
+  priority    Int      @default(0) // 0=baja, 1=media, 2=alta
+  link        String?  // URL opcional para comprar
+  isPurchased Boolean  @default(false) // Solo visible para quien lo regala
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([userId, eventId])
+}
+
+// Mensajes anónimos entre participantes
+model Message {
+  id         Int      @id @default(autoincrement())
+  eventId    Int
+  senderId   Int      // Quien envía
+  receiverId Int      // Quien recibe
+  content    String   // Contenido del mensaje
+  isAnonymous Boolean @default(true) // Si es anónimo o no
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  event    Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sender   User  @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User  @relation("ReceiverMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+// Invitaciones para registro
+model Invitation {
+  id        Int      @id @default(autoincrement())
+  email     String   // Email del invitado
+  code      String   @unique // Código único de invitación
+  senderId  Int      // Quien envía la invitación
+  used      Boolean  @default(false) // Si ya fue usada
+  expiresAt DateTime // Fecha de expiración
+  createdAt DateTime @default(now())
+
+  sender User @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([code])
+  @@index([senderId])
+  @@index([used])
+  @@index([expiresAt])
+}

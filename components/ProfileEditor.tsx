@@ -16,7 +16,8 @@ import {
 
 import { useToast } from './ToastProvider'
 import { TwoFactorSetup } from './TwoFactorSetup'
-import type { User } from '@prisma/client'
+import { User } from '@/app/generated/prisma'
+
 
 interface ProfileEditorProps {
   user: User

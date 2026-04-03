@@ -148,7 +148,7 @@ export async function sendInvitationAction(
       },
     })
 
-    const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const appUrl = process.env.NEXTAUTH_URL
 
     try {
       await sendEmail({

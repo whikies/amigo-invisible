@@ -5,68 +5,7 @@ import { StatCard } from './StatCard'
 import { UpcomingEvents } from './UpcomingEvents'
 import { QuickAction } from './QuickAction'
 import Link from 'next/link'
-
-interface PersonalStats {
-  totalEvents: number
-  activeEvents: number
-  drawnEvents: number
-  assignments: number
-  exclusions: number
-  upcomingEvents: Array<{
-    id: number
-    name: string
-    eventDate: Date | null
-    isDrawn: boolean
-  }>
-}
-
-interface AdminStats {
-  users: {
-    total: number
-    active: number
-    inactive: number
-    admins: number
-  }
-  events: {
-    total: number
-    active: number
-    drawn: number
-    pending: number
-  }
-  assignments: {
-    total: number
-  }
-  exclusions: {
-    total: number
-  }
-  participation: {
-    average: number
-  }
-  recent: {
-    users: Array<{
-      id: number
-      name: string
-      email: string
-      createdAt: Date
-      role: string
-    }>
-    events: Array<{
-      id: number
-      name: string
-      year: number
-      isActive: boolean
-      isDrawn: boolean
-      participantCount: number
-      assignmentCount: number
-      createdAt: Date
-    }>
-  }
-}
-
-interface StatsData {
-  personal: PersonalStats
-  admin: AdminStats | null
-}
+import { getDashboardStatsAction, type StatsData } from '@/app/actions/stats'
 
 interface DashboardContentProps {
   isAdmin: boolean
@@ -80,12 +19,12 @@ export function DashboardContent({ isAdmin }: DashboardContentProps) {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const response = await fetch('/api/stats')
-        if (!response.ok) {
-          throw new Error('Error al cargar estadísticas')
+        const result = await getDashboardStatsAction()
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Error al cargar estadísticas')
         }
-        const data = await response.json()
-        setStats(data)
+
+        setStats(result.data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido')
       } finally {

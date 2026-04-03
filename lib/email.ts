@@ -23,15 +23,6 @@ const transporter = nodemailer.createTransport({
  */
 export async function sendEmail(options: EmailOptions): Promise<void> {
   try {
-    // En desarrollo, solo logear el email en lugar de enviarlo
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📧 Email (DEV MODE - no enviado):')
-      console.log('To:', options.to)
-      console.log('Subject:', options.subject)
-      console.log('HTML:', options.html.substring(0, 200) + '...')
-      return
-    }
-
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || '"Amigo Invisible" <noreply@amigosinvisible.com>',
       to: options.to,

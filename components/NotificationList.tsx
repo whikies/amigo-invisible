@@ -3,6 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+
+import {
+  deleteNotificationAction,
+  markAllNotificationsAsReadAction,
+  markNotificationAsReadAction,
+} from '@/app/actions/notifications'
+
 import { useToast } from './ToastProvider'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -29,11 +36,9 @@ export function NotificationList({ initialNotifications }: NotificationListProps
 
   const handleMarkAsRead = async (notificationId: number) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
-        method: 'PUT'
-      })
+      const result = await markNotificationAsReadAction(notificationId)
 
-      if (response.ok) {
+      if (result.success) {
         setNotifications(prev =>
           prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
         )
@@ -47,11 +52,9 @@ export function NotificationList({ initialNotifications }: NotificationListProps
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/mark-all-read', {
-        method: 'POST'
-      })
+      const result = await markAllNotificationsAsReadAction()
 
-      if (response.ok) {
+      if (result.success) {
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
         router.refresh()
         toast.success('Todas las notificaciones marcadas como leídas')
@@ -67,11 +70,9 @@ export function NotificationList({ initialNotifications }: NotificationListProps
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/notifications/${deleteId}`, {
-        method: 'DELETE'
-      })
+      const result = await deleteNotificationAction(deleteId)
 
-      if (response.ok) {
+      if (result.success) {
         setNotifications(prev => prev.filter(n => n.id !== deleteId))
         router.refresh()
         toast.success('Notificación eliminada')

@@ -3,6 +3,13 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
+
+import {
+  disableTwoFactorAction,
+  enableTwoFactorAction,
+  setupTwoFactorAction,
+} from '@/app/actions/two-factor'
+
 import { useToast } from './ToastProvider'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -23,18 +30,14 @@ export function TwoFactorSetup() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/2fa/setup', {
-        method: 'POST'
-      })
+      const result = await setupTwoFactorAction()
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al iniciar configuración')
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Error al iniciar configuracion')
       }
 
-      setQrCode(data.qrCode)
-      setSecret(data.secret)
+      setQrCode(result.data.qrCode)
+      setSecret(result.data.secret)
       setSetupMode(true)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al configurar 2FA')
@@ -52,19 +55,13 @@ export function TwoFactorSetup() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/2fa/enable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          secret,
-          token: verificationCode
-        })
+      const result = await enableTwoFactorAction({
+        secret: secret ?? '',
+        token: verificationCode,
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al habilitar 2FA')
+      if (!result.success) {
+        throw new Error(result.error || 'Error al habilitar 2FA')
       }
 
       toast.success('2FA habilitado exitosamente')
@@ -91,16 +88,12 @@ export function TwoFactorSetup() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/2fa/disable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: disablePassword })
+      const result = await disableTwoFactorAction({
+        password: disablePassword,
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al deshabilitar 2FA')
+      if (!result.success) {
+        throw new Error(result.error || 'Error al deshabilitar 2FA')
       }
 
       toast.success('2FA deshabilitado exitosamente')
@@ -130,10 +123,10 @@ export function TwoFactorSetup() {
             </p>
             {qrCode && (
               <div className="flex justify-center p-4 bg-white rounded">
-                <Image 
-                  src={qrCode} 
-                  alt="QR Code para 2FA" 
-                  width={256} 
+                <Image
+                  src={qrCode}
+                  alt="QR Code para 2FA"
+                  width={256}
                   height={256}
                   unoptimized
                   className="w-64 h-64"

@@ -1,6 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+
+import {
+  createWishListItemAction,
+  getWishListAction,
+  deleteWishListItemAction,
+  updateWishListPurchasedAction,
+} from '@/app/actions/wishlist'
+import {
+  createWishListFormSchema,
+} from '@/lib/validation/wishlist'
+
 import { useToast } from './ToastProvider'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -10,7 +24,7 @@ interface WishListItem {
   priority: number
   link?: string | null
   isPurchased: boolean
-  createdAt: string
+  createdAt: Date
 }
 
 interface WishListProps {
@@ -26,72 +40,56 @@ export function WishList({ eventId, userId, canEdit = false }: WishListProps) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
-
-  // Form state
-  const [newItem, setNewItem] = useState({
-    item: '',
-    priority: 0,
-    link: ''
+  type FormValuesInput = z.input<typeof createWishListFormSchema>
+  type FormValuesOutput = z.output<typeof createWishListFormSchema>
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValuesInput, unknown, FormValuesOutput>({
+    resolver: zodResolver(createWishListFormSchema),
+    defaultValues: {
+      item: '',
+      priority: 0,
+      link: '',
+    },
   })
-  const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchWishList()
-  }, [eventId, userId])
-
-  const fetchWishList = async () => {
+  const fetchWishList = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ eventId: eventId.toString() })
-      if (userId) params.append('userId', userId.toString())
+      const result = await getWishListAction({ eventId, userId })
+      if (!result.success) throw new Error(result.error || 'Error al cargar lista')
 
-      const response = await fetch(`/api/wishlist?${params}`)
-      if (!response.ok) throw new Error('Error al cargar lista')
-
-      const data = await response.json()
-      setItems(data)
-    } catch (error) {
+      setItems(result.data || [])
+    } catch {
       toast.error('Error al cargar lista de deseos')
     } finally {
       setLoading(false)
     }
-  }
+  }, [eventId, toast, userId])
 
-  const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    void fetchWishList()
+  }, [fetchWishList])
 
-    if (!newItem.item.trim()) {
-      toast.warning('Descripción requerida')
+  const handleAddItem = handleSubmit(async (values) => {
+    const result = await createWishListItemAction({
+      eventId,
+      ...values,
+      link: values.link || undefined,
+    })
+
+    if (!result.success) {
+      toast.error(result.error ?? 'Error al agregar item')
       return
     }
 
-    setSubmitting(true)
-
-    try {
-      const response = await fetch('/api/wishlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId,
-          ...newItem,
-          link: newItem.link || null
-        })
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error)
-      }
-
-      toast.success('Item agregado a la lista')
-      setNewItem({ item: '', priority: 0, link: '' })
-      setShowAddForm(false)
-      fetchWishList()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al agregar item')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+    toast.success('Item agregado a la lista')
+    reset({ item: '', priority: 0, link: '' })
+    setShowAddForm(false)
+    fetchWishList()
+  })
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -99,15 +97,12 @@ export function WishList({ eventId, userId, canEdit = false }: WishListProps) {
     setDeleting(true)
 
     try {
-      const response = await fetch(`/api/wishlist/${deleteId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) throw new Error('Error al eliminar')
+      const result = await deleteWishListItemAction(deleteId)
+      if (!result.success) throw new Error(result.error)
 
       toast.success('Item eliminado')
       fetchWishList()
-    } catch (error) {
+    } catch {
       toast.error('Error al eliminar item')
     } finally {
       setDeleting(false)
@@ -117,17 +112,15 @@ export function WishList({ eventId, userId, canEdit = false }: WishListProps) {
 
   const handleTogglePurchased = async (id: number, isPurchased: boolean) => {
     try {
-      const response = await fetch(`/api/wishlist/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isPurchased: !isPurchased })
+      const result = await updateWishListPurchasedAction({
+        id,
+        isPurchased: !isPurchased,
       })
-
-      if (!response.ok) throw new Error('Error al actualizar')
+      if (!result.success) throw new Error(result.error)
 
       toast.success(isPurchased ? 'Marcado como no comprado' : 'Marcado como comprado')
       fetchWishList()
-    } catch (error) {
+    } catch {
       toast.error('Error al actualizar estado')
     }
   }
@@ -170,18 +163,21 @@ export function WishList({ eventId, userId, canEdit = false }: WishListProps) {
 
       {showAddForm && (
         <form onSubmit={handleAddItem} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3 animate-fade-in">
+          {errors.root?.message && (
+            <p className="text-sm text-red-600 dark:text-red-400">{errors.root.message}</p>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Descripción del regalo / Hint
             </label>
             <input
               type="text"
-              value={newItem.item}
-              onChange={(e) => setNewItem({ ...newItem, item: e.target.value })}
               placeholder="Ej: Libro de cocina, auriculares bluetooth..."
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-              disabled={submitting}
+              disabled={isSubmitting}
+              {...register('item')}
             />
+            {errors.item && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.item.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -190,15 +186,15 @@ export function WishList({ eventId, userId, canEdit = false }: WishListProps) {
                 Prioridad
               </label>
               <select
-                value={newItem.priority}
-                onChange={(e) => setNewItem({ ...newItem, priority: parseInt(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                disabled={submitting}
+                disabled={isSubmitting}
+                {...register('priority', { valueAsNumber: true })}
               >
                 <option value={0}>Baja</option>
                 <option value={1}>Media</option>
                 <option value={2}>Alta</option>
               </select>
+              {errors.priority && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority.message}</p>}
             </div>
 
             <div>
@@ -207,21 +203,21 @@ export function WishList({ eventId, userId, canEdit = false }: WishListProps) {
               </label>
               <input
                 type="url"
-                value={newItem.link}
-                onChange={(e) => setNewItem({ ...newItem, link: e.target.value })}
                 placeholder="https://..."
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                disabled={submitting}
+                disabled={isSubmitting}
+                {...register('link')}
               />
+              {errors.link && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.link.message}</p>}
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={isSubmitting}
             className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition font-medium disabled:opacity-50"
           >
-            {submitting ? 'Agregando...' : 'Agregar a mi lista'}
+            {isSubmitting ? 'Agregando...' : 'Agregar a mi lista'}
           </button>
         </form>
       )}

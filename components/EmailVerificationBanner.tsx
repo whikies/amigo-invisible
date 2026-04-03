@@ -1,34 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+
+import { sendVerificationEmailAction } from '@/app/actions/auth'
+
 import { useToast } from './ToastProvider'
 
 export function EmailVerificationBanner() {
   const toast = useToast()
-  const [loading, setLoading] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const [hidden, setHidden] = useState(false)
 
   const handleResend = async () => {
-    setLoading(true)
+    startTransition(async () => {
+      const result = await sendVerificationEmailAction()
 
-    try {
-      const response = await fetch('/api/auth/send-verification', {
-        method: 'POST'
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al enviar email')
+      if (!result.success) {
+        toast.error(result.error ?? 'Error al enviar email')
+        return
       }
 
-      toast.success('Email de verificación enviado. Revisa tu bandeja de entrada.')
+      toast.success(result.message ?? 'Email de verificacion enviado. Revisa tu bandeja de entrada.')
       setHidden(true)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al enviar email')
-    } finally {
-      setLoading(false)
-    }
+    })
   }
 
   if (hidden) {
@@ -54,10 +48,10 @@ export function EmailVerificationBanner() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleResend}
-            disabled={loading}
+            disabled={isPending}
             className="text-sm font-medium text-yellow-800 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-200 underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Enviando...' : 'Reenviar email'}
+            {isPending ? 'Enviando...' : 'Reenviar email'}
           </button>
           <button
             onClick={() => setHidden(true)}

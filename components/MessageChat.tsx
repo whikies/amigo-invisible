@@ -1,7 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useCallback, useState, useEffect } from 'react'
+import {
+  getChatParticipantsAction,
+  getMessagesAction,
+  markMessageAsReadAction,
+  sendMessageAction,
+} from '@/app/actions/messages'
 import { useToast } from './ToastProvider'
 
 interface Message {
@@ -9,7 +14,7 @@ interface Message {
   content: string
   isAnonymous: boolean
   isRead: boolean
-  createdAt: string
+  createdAt: Date
   sender: {
     id: number
     name: string
@@ -27,7 +32,6 @@ interface MessageChatProps {
 }
 
 export function MessageChat({ eventId }: MessageChatProps) {
-  const { data: session } = useSession()
   const toast = useToast()
   const [messages, setMessages] = useState<Message[]>([])
   const [participants, setParticipants] = useState<User[]>([])
@@ -39,44 +43,29 @@ export function MessageChat({ eventId }: MessageChatProps) {
   const [messageContent, setMessageContent] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(true)
 
-  useEffect(() => {
-    fetchMessages()
-    fetchParticipants()
-  }, [eventId])
-
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
-      const response = await fetch(`/api/messages?eventId=${eventId}`)
-      if (!response.ok) throw new Error('Error al cargar mensajes')
+      const result = await getMessagesAction({ eventId })
+      if (!result.success) throw new Error(result.error || 'Error al cargar mensajes')
 
-      const data = await response.json()
-      setMessages(data)
-    } catch (error) {
+      setMessages(result.data || [])
+    } catch {
       toast.error('Error al cargar mensajes')
     } finally {
       setLoading(false)
     }
-  }
+  }, [eventId, toast])
 
-  const fetchParticipants = async () => {
+  const fetchParticipants = useCallback(async () => {
     try {
-      const response = await fetch(`/api/eventos/${eventId}`)
-      if (!response.ok) throw new Error('Error al cargar participantes')
+      const result = await getChatParticipantsAction({ eventId })
+      if (!result.success) throw new Error(result.error || 'Error al cargar participantes')
 
-      const data = await response.json()
-      const event = data.event
-
-      // Filtrar el usuario actual
-      const currentUserId = session?.user?.id ? parseInt(String(session.user.id)) : 0
-      const others = event?.participants?.filter(
-        (p: any) => p.user.id !== currentUserId
-      ).map((p: any) => p.user) || []
-
-      setParticipants(others)
-    } catch (error) {
-      console.error('Error al cargar participantes:', error)
+      setParticipants(result.data || [])
+    } catch {
+      console.error('Error al cargar participantes')
     }
-  }
+  }, [eventId])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,29 +76,24 @@ export function MessageChat({ eventId }: MessageChatProps) {
     }
 
     setSending(true)
-
     try {
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId,
-          receiverId: parseInt(selectedReceiver),
-          content: messageContent,
-          isAnonymous
-        })
+      const result = await sendMessageAction({
+        eventId,
+        receiverId: parseInt(selectedReceiver),
+        content: messageContent,
+        isAnonymous,
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error || 'Error al enviar mensaje')
       }
 
+      await fetchMessages()
       toast.success('Mensaje enviado')
       setMessageContent('')
       setSelectedReceiver('')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al enviar mensaje')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al enviar mensaje')
     } finally {
       setSending(false)
     }
@@ -117,14 +101,24 @@ export function MessageChat({ eventId }: MessageChatProps) {
 
   const markAsRead = async (messageId: number) => {
     try {
-      await fetch(`/api/messages/${messageId}`, {
-        method: 'PATCH'
+      const result = await markMessageAsReadAction({
+        messageId,
       })
-      fetchMessages()
-    } catch (error) {
+
+      if (!result.success) {
+        return
+      }
+
+      await fetchMessages()
+    } catch {
       console.error('Error al marcar como leído')
     }
   }
+
+  useEffect(() => {
+    void fetchMessages()
+    void fetchParticipants()
+  }, [fetchMessages, fetchParticipants])
 
   if (loading) {
     return (

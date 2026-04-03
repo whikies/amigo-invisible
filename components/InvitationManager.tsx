@@ -1,32 +1,51 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+
+import { deleteInvitationAction, getSentInvitationsAction, sendInvitationAction } from '@/app/actions/invitations'
+import { applyActionErrors } from '@/lib/form-errors'
+import { invitationSchema, type InvitationInput } from '@/lib/validation/invitation'
+
 import { useToast } from './ToastProvider'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface Invitation {
   id: number
   email: string
   code: string
   used: boolean
-  expiresAt: string
-  createdAt: string
+  expiresAt: Date
+  createdAt: Date
 }
 
 export function InvitationManager() {
   const toast = useToast()
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [email, setEmail] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<InvitationInput>({
+    resolver: zodResolver(invitationSchema),
+    defaultValues: {
+      email: '',
+    },
+  })
 
   const fetchInvitations = useCallback(async () => {
     try {
-      const response = await fetch('/api/invitations')
-      if (!response.ok) throw new Error('Error al cargar invitaciones')
+      const result = await getSentInvitationsAction()
+      if (!result.success) throw new Error(result.error || 'Error al cargar invitaciones')
 
-      const data = await response.json()
-      setInvitations(data.invitations || [])
+      setInvitations(result.data || [])
     } catch {
       toast.error('Error al cargar invitaciones')
     } finally {
@@ -38,44 +57,34 @@ export function InvitationManager() {
     fetchInvitations()
   }, [fetchInvitations])
 
-  const handleSendInvitation = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSendInvitation = handleSubmit(async (values) => {
+    const result = await sendInvitationAction(values)
 
-    if (!email.trim()) {
-      toast.warning('El email es requerido')
+    if (!result.success) {
+      applyActionErrors(result, setError)
+      toast.error(result.error ?? 'Error al enviar invitacion')
       return
     }
 
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      toast.error('Email inválido')
-      return
-    }
+    toast.success(result.message ?? 'Invitacion enviada')
+    reset()
+    setShowForm(false)
+    void fetchInvitations()
+  })
 
-    setSending(true)
-
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
     try {
-      const response = await fetch('/api/invitations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al enviar invitación')
-      }
-
-      toast.success(`¡Invitación enviada a ${email}!`)
-      setEmail('')
-      setShowForm(false)
-      fetchInvitations()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al enviar invitación')
+      const result = await deleteInvitationAction(deleteId)
+      if (!result.success) throw new Error(result.error)
+      toast.success('Invitacion eliminada')
+      void fetchInvitations()
+    } catch {
+      toast.error('Error al eliminar invitacion')
     } finally {
-      setSending(false)
+      setDeleting(false)
+      setDeleteId(null)
     }
   }
 
@@ -110,8 +119,8 @@ export function InvitationManager() {
     )
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
+  const formatDate = (dateValue: Date | string) => {
+    return new Date(dateValue).toLocaleDateString('es-ES', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -158,19 +167,25 @@ export function InvitationManager() {
           </h3>
 
           <form onSubmit={handleSendInvitation} className="space-y-4">
+            {errors.root?.serverError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                {errors.root.serverError.message}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email del invitado
               </label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="ejemplo@email.com"
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                disabled={sending}
-                required
+                disabled={isSubmitting}
+                {...register('email')}
               />
+              {errors.email && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
+              )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Se enviará un email con el código de invitación. La invitación será válida por 7 días.
               </p>
@@ -178,10 +193,10 @@ export function InvitationManager() {
 
             <button
               type="submit"
-              disabled={sending}
+              disabled={isSubmitting}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition disabled:opacity-50"
             >
-              {sending ? 'Enviando...' : '✉ Enviar Invitación'}
+              {isSubmitting ? 'Enviando...' : '✉ Enviar Invitación'}
             </button>
           </form>
         </div>
@@ -238,12 +253,34 @@ export function InvitationManager() {
                       <p>Expira: {formatDate(invitation.expiresAt)}</p>
                     </div>
                   </div>
+
+                  {!invitation.used && (
+                    <button
+                      onClick={() => setDeleteId(invitation.id)}
+                      className="ml-3 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 shrink-0"
+                      title="Eliminar invitación"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Eliminar Invitación"
+        message="¿Seguro que deseas eliminar esta invitación? El destinatario ya no podrá usarla para registrarse."
+        type="danger"
+        loading={deleting}
+      />
     </div>
   )
 }

@@ -2,26 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-
-interface Event {
-  id: number
-  name: string
-  description?: string
-  year: number
-  drawDate?: string
-  eventDate?: string
-  isActive: boolean
-  isDrawn: boolean
-  createdAt: string
-  stats: {
-    totalParticipants: number
-    hadAssignment: boolean
-    isCompleted: boolean
-  }
-}
+import { getEventHistoryAction, exportEventsHistoryAction } from '@/app/actions/history'
+import type { EventHistoryItem } from '@/app/actions/history'
 
 export function HistorialContent() {
-  const [events, setEvents] = useState<Event[]>([])
+  const [events, setEvents] = useState<EventHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -31,12 +16,11 @@ export function HistorialContent() {
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch('/api/events/history')
-      if (!response.ok) throw new Error('Error al cargar historial')
+      const result = await getEventHistoryAction()
+      if (!result.success) throw new Error(result.error || 'Error al cargar historial')
 
-      const data = await response.json()
-      setEvents(data)
-    } catch (error) {
+      setEvents(result.data || [])
+    } catch {
       setError(true)
     } finally {
       setLoading(false)
@@ -45,16 +29,23 @@ export function HistorialContent() {
 
   const handleExport = async (format: 'csv' | 'json') => {
     try {
-      const response = await fetch(`/api/export?format=${format}`)
-      const blob = await response.blob()
+      const result = await exportEventsHistoryAction(format)
+      if (!result.success || !result.data) {
+        console.error('Error al exportar:', result.error)
+        return
+      }
+
+      const blob = new Blob([result.data.data], {
+        type: format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json',
+      })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `eventos-${Date.now()}.${format}`
+      a.download = result.data.filename
       a.click()
       window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error al exportar:', error)
+    } catch {
+      console.error('Error al exportar')
     }
   }
 

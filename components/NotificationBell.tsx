@@ -3,6 +3,13 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 
+import {
+  deleteNotificationAction,
+  getNotificationsAction,
+  markAllNotificationsAsReadAction,
+  markNotificationAsReadAction,
+} from '@/app/actions/notifications'
+
 interface Notification {
   id: number
   type: string
@@ -22,11 +29,10 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('/api/notifications')
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data.notifications)
-        setUnreadCount(data.unreadCount)
+      const result = await getNotificationsAction()
+      if (result.success && result.data) {
+        setNotifications(result.data.notifications)
+        setUnreadCount(result.data.unreadCount)
       }
     } catch (error) {
       console.error('Error al cargar notificaciones:', error)
@@ -58,11 +64,9 @@ export function NotificationBell() {
 
   const handleMarkAsRead = async (notificationId: number) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
-        method: 'PUT'
-      })
+      const result = await markNotificationAsReadAction(notificationId)
 
-      if (response.ok) {
+      if (result.success) {
         // Actualizar estado local
         setNotifications(prev =>
           prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
@@ -76,11 +80,9 @@ export function NotificationBell() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/mark-all-read', {
-        method: 'POST'
-      })
+      const result = await markAllNotificationsAsReadAction()
 
-      if (response.ok) {
+      if (result.success) {
         // Actualizar estado local
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
         setUnreadCount(0)
@@ -94,11 +96,9 @@ export function NotificationBell() {
     e.stopPropagation()
 
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
-        method: 'DELETE'
-      })
+      const result = await deleteNotificationAction(notificationId)
 
-      if (response.ok) {
+      if (result.success) {
         setNotifications(prev => prev.filter(n => n.id !== notificationId))
         if (!notifications.find(n => n.id === notificationId)?.isRead) {
           setUnreadCount(prev => Math.max(0, prev - 1))

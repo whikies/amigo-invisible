@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { redirect } from 'next/navigation'
 
 /**
  * GET /api/auth/verify-email?token=xxx

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { decryptAssignmentAction } from '@/app/actions/event-participation'
 
 interface DecryptAssignmentProps {
   eventId: number
@@ -38,26 +39,17 @@ export function DecryptAssignment({ eventId, encryptedData }: DecryptAssignmentP
     setError('')
 
     try {
-      const response = await fetch('/api/decrypt-assignment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          password,
-          encryptedData
-        })
-      })
+      const result = await decryptAssignmentAction(password, encryptedData)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al descifrar')
+      if (!result.success) {
+        throw new Error(result.error || 'Error al descifrar')
       }
 
-      setDecryptedUser(data.user)
+      if (result.data) {
+        setDecryptedUser(result.data.user)
+      }
       setPassword('') // Clear password
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Error decrypting:', err)
       setError(err.message || 'Contraseña incorrecta o error al descifrar')

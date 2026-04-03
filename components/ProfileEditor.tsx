@@ -1,7 +1,19 @@
 'use client'
 
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
+
+import { changePasswordAction, updateProfileAction } from '@/app/actions/profile'
+import { applyActionErrors } from '@/lib/form-errors'
+import {
+  changePasswordSchema,
+  updateProfileSchema,
+  type ChangePasswordInput,
+  type UpdateProfileInput,
+} from '@/lib/validation/profile'
+
 import { useToast } from './ToastProvider'
 import { TwoFactorSetup } from './TwoFactorSetup'
 import type { User } from '@prisma/client'
@@ -15,108 +27,65 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
   const toast = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  // Datos del perfil
-  const [formData, setFormData] = useState({
-    name: user.name || '',
-    email: user.email
+  const profileForm = useForm<UpdateProfileInput>({
+    resolver: zodResolver(updateProfileSchema),
+    defaultValues: {
+      name: user.name || '',
+      email: user.email,
+    },
   })
 
-  // Datos para cambio de contraseña
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+  const passwordForm = useForm<ChangePasswordInput>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
   })
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const handleUpdateProfile = profileForm.handleSubmit(async (values) => {
+    const result = await updateProfileAction(values)
 
-    try {
-      const response = await fetch('/api/perfil', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email
-        })
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Error al actualizar perfil')
-      }
-
-      toast.success('Perfil actualizado exitosamente')
-      setIsEditing(false)
-      router.refresh()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al actualizar perfil')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // Validaciones
-    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      toast.warning('Todos los campos son obligatorios')
+    if (!result.success) {
+      applyActionErrors(result, profileForm.setError)
+      toast.error(result.error ?? 'Error al actualizar perfil')
       return
     }
 
-    if (passwordData.newPassword.length < 6) {
-      toast.warning('La nueva contraseña debe tener al menos 6 caracteres')
+    toast.success(result.message ?? 'Perfil actualizado exitosamente')
+    setIsEditing(false)
+    router.refresh()
+  })
+
+  const handleChangePassword = passwordForm.handleSubmit(async (values) => {
+    const result = await changePasswordAction(values)
+
+    if (!result.success) {
+      applyActionErrors(result, passwordForm.setError)
+      toast.error(result.error ?? 'Error al cambiar contrasena')
       return
     }
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.warning('Las contraseñas no coinciden')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/perfil/password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Error al cambiar contraseña')
-      }
-
-      toast.success('Contraseña actualizada exitosamente')
-      setIsChangingPassword(false)
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      })
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al cambiar contraseña')
-    } finally {
-      setLoading(false)
-    }
-  }
+    toast.success(result.message ?? 'Contrasena actualizada exitosamente')
+    setIsChangingPassword(false)
+    passwordForm.reset({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    })
+  })
 
   return (
     <div className="p-6">
-      {/* Editar Perfil */}
+      {/* Perfil */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Información Personal
           </h2>
+
           {!isEditing && (
             <button
               onClick={() => setIsEditing(true)}
@@ -129,17 +98,28 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
 
         {isEditing ? (
           <form onSubmit={handleUpdateProfile} className="space-y-4">
+            {profileForm.formState.errors.root?.serverError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                {profileForm.formState.errors.root.serverError.message}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Nombre
               </label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Tu nombre"
+                disabled={profileForm.formState.isSubmitting}
+                {...profileForm.register('name')}
               />
+              {profileForm.formState.errors.name && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  {profileForm.formState.errors.name.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -148,28 +128,30 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
               </label>
               <input
                 type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                required
+                disabled={profileForm.formState.isSubmitting}
+                {...profileForm.register('email')}
               />
+              {profileForm.formState.errors.email && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{profileForm.formState.errors.email.message}</p>
+              )}
             </div>
 
             <div className="flex gap-2">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={profileForm.formState.isSubmitting}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
               >
-                {loading ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+                {profileForm.formState.isSubmitting ? '⏳ Guardando...' : '💾 Guardar Cambios'}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setIsEditing(false)
-                  setFormData({ name: user.name || '', email: user.email })
+                  profileForm.reset({ name: user.name || '', email: user.email })
                 }}
-                disabled={loading}
+                disabled={profileForm.formState.isSubmitting}
                 className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors font-medium disabled:opacity-50"
               >
                 ❌ Cancelar
@@ -199,6 +181,7 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Seguridad
+
           </h2>
           {!isChangingPassword && (
             <button
@@ -212,17 +195,25 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
 
         {isChangingPassword ? (
           <form onSubmit={handleChangePassword} className="space-y-4">
+            {passwordForm.formState.errors.root?.serverError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                {passwordForm.formState.errors.root.serverError.message}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Contraseña Actual
               </label>
               <input
                 type="password"
-                value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-                required
+                disabled={passwordForm.formState.isSubmitting}
+                {...passwordForm.register('currentPassword')}
               />
+              {passwordForm.formState.errors.currentPassword && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{passwordForm.formState.errors.currentPassword.message}</p>
+              )}
             </div>
 
             <div>
@@ -231,15 +222,16 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
               </label>
               <input
                 type="password"
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-                required
-                minLength={6}
+                disabled={passwordForm.formState.isSubmitting}
+                {...passwordForm.register('newPassword')}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Mínimo 6 caracteres
               </p>
+              {passwordForm.formState.errors.newPassword && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{passwordForm.formState.errors.newPassword.message}</p>
+              )}
             </div>
 
             <div>
@@ -248,32 +240,34 @@ export function ProfileEditor({ user }: ProfileEditorProps) {
               </label>
               <input
                 type="password"
-                value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
-                required
+                disabled={passwordForm.formState.isSubmitting}
+                {...passwordForm.register('confirmPassword')}
               />
+              {passwordForm.formState.errors.confirmPassword && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{passwordForm.formState.errors.confirmPassword.message}</p>
+              )}
             </div>
 
             <div className="flex gap-2">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={passwordForm.formState.isSubmitting}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
               >
-                {loading ? '⏳ Cambiando...' : '🔐 Cambiar Contraseña'}
+                {passwordForm.formState.isSubmitting ? '⏳ Cambiando...' : '🔐 Cambiar Contraseña'}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setIsChangingPassword(false)
-                  setPasswordData({
+                  passwordForm.reset({
                     currentPassword: '',
                     newPassword: '',
                     confirmPassword: ''
                   })
                 }}
-                disabled={loading}
+                disabled={passwordForm.formState.isSubmitting}
                 className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors font-medium disabled:opacity-50"
               >
                 ❌ Cancelar

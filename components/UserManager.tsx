@@ -4,6 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 
+import {
+  createUserAction,
+  deleteUserAction,
+  getImpersonationDataAction,
+  updateUserAction,
+} from '@/app/actions/user-management'
+
 interface User {
   id: number
   email: string
@@ -72,33 +79,19 @@ export function UserManager({ usuarios, currentUserId }: UserManagerProps) {
 
     try {
       if (modalMode === 'create') {
-        // Crear usuario
-        const response = await fetch('/api/usuarios', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, role, isActive })
-        })
-
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error)
+        const result = await createUserAction({ name, email, password, role, isActive })
+        if (!result.success) throw new Error(result.error)
 
         alert('✅ Usuario creado exitosamente')
       } else if (modalMode === 'edit' && selectedUser) {
-        // Editar usuario
-        const response = await fetch(`/api/usuarios/${selectedUser.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name,
-            email,
-            ...(password ? { password } : {}),
-            role,
-            isActive
-          })
+        const result = await updateUserAction(selectedUser.id, {
+          name,
+          email,
+          ...(password ? { password } : {}),
+          role,
+          isActive,
         })
-
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error)
+        if (!result.success) throw new Error(result.error)
 
         alert('✅ Usuario actualizado exitosamente')
       }
@@ -126,14 +119,8 @@ export function UserManager({ usuarios, currentUserId }: UserManagerProps) {
     }
 
     try {
-      const response = await fetch(`/api/usuarios/${user.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !user.isActive })
-      })
-
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
+      const result = await updateUserAction(user.id, { isActive: !user.isActive })
+      if (!result.success) throw new Error(result.error)
 
       alert(`✅ Usuario ${action} exitosamente`)
       router.refresh()
@@ -155,23 +142,18 @@ export function UserManager({ usuarios, currentUserId }: UserManagerProps) {
     }
 
     try {
-      // Obtener token de impersonación
-      const response = await fetch(`/api/usuarios/${user.id}/impersonate`, {
-        method: 'POST'
-      })
-
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
+      const result = await getImpersonationDataAction(user.id)
+      if (!result.success || !result.data) throw new Error(result.error)
 
       // Hacer signIn con el provider de impersonación
-      const result = await signIn('impersonate', {
-        userId: data.impersonateData.userId,
-        adminId: data.impersonateData.adminId,
-        token: data.impersonateData.token,
+      const signInResult = await signIn('impersonate', {
+        userId: result.data.userId,
+        adminId: result.data.adminId,
+        token: result.data.token,
         redirect: false
       })
 
-      if (result?.error) {
+      if (signInResult?.error) {
         throw new Error('Error al impersonar')
       }
 
@@ -197,12 +179,8 @@ export function UserManager({ usuarios, currentUserId }: UserManagerProps) {
     }
 
     try {
-      const response = await fetch(`/api/usuarios/${user.id}`, {
-        method: 'DELETE'
-      })
-
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
+      const result = await deleteUserAction(user.id)
+      if (!result.success) throw new Error(result.error)
 
       alert('✅ Usuario eliminado exitosamente')
       router.refresh()

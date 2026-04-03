@@ -1,7 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+
+import {
+  addParticipantsAction,
+  getAvailableUsersAction,
+  removeParticipantAction,
+} from '@/app/actions/user-management'
 
 interface User {
   id: number
@@ -29,42 +35,36 @@ export function ParticipantManager({ eventId, participants: initialParticipants 
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
+  const fetchAvailableUsers = useCallback(async () => {
+    try {
+      const result = await getAvailableUsersAction(eventId)
+
+      if (result.success && result.data) {
+        setAvailableUsers(result.data.users)
+      }
+    } catch {
+      console.error('Error fetching users')
+    }
+  }, [eventId])
+
   useEffect(() => {
     if (showAddModal) {
-      fetchAvailableUsers()
+      void fetchAvailableUsers()
     }
-  }, [showAddModal])
-
-  async function fetchAvailableUsers() {
-    try {
-      const response = await fetch(`/api/eventos/${eventId}/available-users`)
-      const data = await response.json()
-
-      if (response.ok) {
-        setAvailableUsers(data.users)
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error)
-    }
-  }
+  }, [showAddModal, fetchAvailableUsers])
 
   async function handleAddParticipants() {
     if (selectedUsers.size === 0) return
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/eventos/${eventId}/participants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIds: Array.from(selectedUsers)
-        })
+      const result = await addParticipantsAction({
+        eventId,
+        userIds: Array.from(selectedUsers),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
       alert(`✅ ${selectedUsers.size} participante(s) agregado(s)`)
@@ -86,14 +86,10 @@ export function ParticipantManager({ eventId, participants: initialParticipants 
     }
 
     try {
-      const response = await fetch(`/api/eventos/${eventId}/participants/${participantId}`, {
-        method: 'DELETE'
-      })
+      const result = await removeParticipantAction(eventId, participantId)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
       alert(`✅ ${userName} eliminado del evento`)

@@ -1,8 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useTransition } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { z } from 'zod'
+
+import { deleteEventAction, updateEventAction } from '@/app/actions/events'
+import { useToast } from '@/components/ToastProvider'
+import { applyActionErrors } from '@/lib/form-errors'
+import { updateEventSchema } from '@/lib/validation/event'
 
 interface Event {
   id: number
@@ -21,98 +29,78 @@ interface EditEventoFormProps {
 
 export function EditEventoForm({ event }: EditEventoFormProps) {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useToast()
+  const [isDeleting, startDeleting] = useTransition()
 
-  // Función helper para formatear fechas a formato YYYY-MM-DD
   const formatDate = (date: Date | null) => {
     if (!date) return ''
-    const d = new Date(date)
-    return d.toISOString().split('T')[0]
+    const normalizedDate = new Date(date)
+    return normalizedDate.toISOString().split('T')[0]
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+  const currentYear = new Date().getFullYear()
+  const schema = updateEventSchema(currentYear)
+  type FormValuesInput = z.input<typeof schema>
+  type FormValuesOutput = z.output<typeof schema>
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValuesInput, unknown, FormValuesOutput>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      name: event.name,
+      description: event.description || '',
+      year: event.year,
+      eventDate: formatDate(event.eventDate),
+      drawDate: formatDate(event.drawDate),
+      isActive: event.isActive,
+    },
+  })
 
-    const formData = new FormData(e.currentTarget)
-    const data = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      year: parseInt(formData.get('year') as string),
-      eventDate: formData.get('eventDate') as string,
-      drawDate: formData.get('drawDate') as string,
-      isActive: formData.get('isActive') === 'on'
+  const onSubmit = handleSubmit(async (values) => {
+    const result = await updateEventAction(event.id, values)
+
+    if (!result.success) {
+      applyActionErrors(result, setError)
+      toast.error(result.error ?? 'Error al actualizar el evento')
+      return
     }
 
-    try {
-      const response = await fetch(`/api/eventos/${event.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Error al actualizar el evento')
-      }
-
-      alert('✅ Evento actualizado exitosamente')
-      router.push(`/admin/eventos/${event.id}`)
-      router.refresh()
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error('Error:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+    toast.success(result.message ?? 'Evento actualizado exitosamente')
+    router.push(`/admin/eventos/${event.id}`)
+    router.refresh()
+  })
 
   async function handleDelete() {
     if (!confirm(`⚠️ ¿Estás seguro de que deseas eliminar el evento "${event.name}"?\n\nEsta acción no se puede deshacer.`)) {
       return
     }
 
-    setLoading(true)
-    setError('')
+    startDeleting(async () => {
+      const result = await deleteEventAction(event.id)
 
-    try {
-      const response = await fetch(`/api/eventos/${event.id}`, {
-        method: 'DELETE'
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Error al eliminar el evento')
+      if (!result.success) {
+        setError('root.serverError', {
+          type: 'server',
+          message: result.error ?? 'Error al eliminar el evento',
+        })
+        toast.error(result.error ?? 'Error al eliminar el evento')
+        return
       }
 
-      alert('✅ Evento eliminado exitosamente')
+      toast.success(result.message ?? 'Evento eliminado exitosamente')
       router.push('/admin/eventos')
       router.refresh()
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error('Error:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+    })
   }
 
-  const currentYear = new Date().getFullYear()
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
+    <form onSubmit={onSubmit} className="space-y-6">
+      {errors.root?.serverError && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300">
-          {error}
+          {errors.root.serverError.message}
         </div>
       )}
 
@@ -131,12 +119,11 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
         <input
           type="text"
           id="name"
-          name="name"
-          required
-          defaultValue={event.name}
           placeholder="Ej: Amigo Invisible Reyes Magos 2026"
           className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          {...register('name')}
         />
+        {errors.name && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>}
       </div>
 
       {/* Descripción */}
@@ -146,12 +133,12 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
         </label>
         <textarea
           id="description"
-          name="description"
           rows={3}
-          defaultValue={event.description || ''}
           placeholder="Describe el evento (opcional)"
           className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          {...register('description')}
         />
+        {errors.description && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.description.message}</p>}
       </div>
 
       {/* Año */}
@@ -162,13 +149,12 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
         <input
           type="number"
           id="year"
-          name="year"
-          required
           min={currentYear - 5}
           max={currentYear + 10}
-          defaultValue={event.year}
           className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          {...register('year', { valueAsNumber: true })}
         />
+        {errors.year && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.year.message}</p>}
       </div>
 
       {/* Fechas */}
@@ -181,13 +167,13 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
           <input
             type="date"
             id="eventDate"
-            name="eventDate"
-            defaultValue={formatDate(event.eventDate)}
             className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            {...register('eventDate')}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Día del intercambio de regalos
           </p>
+          {errors.eventDate && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.eventDate.message}</p>}
         </div>
 
         {/* Fecha del sorteo */}
@@ -198,13 +184,13 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
           <input
             type="date"
             id="drawDate"
-            name="drawDate"
-            defaultValue={formatDate(event.drawDate)}
             className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            {...register('drawDate')}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Día en que se realizará el sorteo
           </p>
+          {errors.drawDate && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.drawDate.message}</p>}
         </div>
       </div>
 
@@ -213,10 +199,9 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
         <input
           type="checkbox"
           id="isActive"
-          name="isActive"
-          defaultChecked={event.isActive}
           disabled={event.isDrawn}
           className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          {...register('isActive')}
         />
         <label htmlFor="isActive" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
           Evento activo (los usuarios podrán verlo y participar)
@@ -235,10 +220,10 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
       <div className="flex gap-4 pt-4">
         <button
           type="submit"
-          disabled={loading}
+          disabled={isSubmitting || isDeleting}
           className="flex-1 px-6 py-3 bg-linear-to-r from-blue-600 to-green-600 text-white rounded-lg hover:from-blue-700 hover:to-green-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
         >
-          {loading ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+          {isSubmitting ? '⏳ Guardando...' : '💾 Guardar Cambios'}
         </button>
         <Link
           href={`/admin/eventos/${event.id}`}
@@ -250,10 +235,10 @@ export function EditEventoForm({ event }: EditEventoFormProps) {
           <button
             type="button"
             onClick={handleDelete}
-            disabled={loading}
+            disabled={isSubmitting || isDeleting}
             className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            🗑️ Eliminar
+            {isDeleting ? '⏳ Eliminando...' : '🗑️ Eliminar'}
           </button>
         )}
       </div>

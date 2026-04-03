@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { Suspense } from 'react'
 
+import { checkTwoFactorRequirementAction } from '@/app/actions/auth'
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -44,21 +46,15 @@ function LoginForm() {
     try {
       // Primero verificar si requiere 2FA
       if (!requires2FA) {
-        const checkResponse = await fetch('/api/auth/check-2fa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        })
+        const checkResult = await checkTwoFactorRequirementAction({ email, password })
 
-        const checkData = await checkResponse.json()
-
-        if (!checkResponse.ok) {
+        if (!checkResult.success) {
           setError('Email o contraseña incorrectos')
           setLoading(false)
           return
         }
 
-        if (checkData.requires2FA) {
+        if (checkResult.data?.requires2FA) {
           // Usuario requiere 2FA, mostrar campo
           setRequires2FA(true)
           setCredentials({ email, password })

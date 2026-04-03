@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+import { joinEventAction, leaveEventAction } from '@/app/actions/event-participation'
+import { useToast } from '@/components/ToastProvider'
+
 interface Evento {
   id: number
   name: string
@@ -24,6 +27,7 @@ interface EventoCardProps {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function EventoCard({ evento, participantCount, isParticipating, userId }: EventoCardProps) {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState(false)
 
   async function handleJoin() {
@@ -34,18 +38,13 @@ export function EventoCard({ evento, participantCount, isParticipating, userId }
     setLoading(true)
 
     try {
-      const response = await fetch(`/api/eventos/${evento.id}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
+      const result = await joinEventAction(evento.id)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
-      alert('✅ Te has inscrito exitosamente')
+      toast.success(result.message ?? 'Te has inscrito exitosamente')
       router.refresh()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,18 +63,13 @@ export function EventoCard({ evento, participantCount, isParticipating, userId }
     setLoading(true)
 
     try {
-      const response = await fetch(`/api/eventos/${evento.id}/leave`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
+      const result = await leaveEventAction(evento.id)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
-      alert('✅ Te has salido del evento')
+      toast.success(result.message ?? 'Te has salido del evento')
       router.refresh()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

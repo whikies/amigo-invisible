@@ -7,7 +7,8 @@ import QRCode from 'qrcode'
  * POST /api/auth/2fa/setup
  * Genera un secret temporal y QR code para configurar 2FA
  */
-export async function POST(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function POST(_request: NextRequest) {
   try {
     const session = await auth()
 

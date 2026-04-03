@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { createExclusionAction, deleteExclusionAction } from '@/app/actions/user-management'
+
 interface User {
   id: number
   name: string
@@ -54,20 +56,14 @@ export function ExclusionManager({ exclusionesIniciales, usuarios }: ExclusionMa
     setLoading(true)
 
     try {
-      const response = await fetch('/api/exclusiones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user1Id,
-          excludedUserId: user2Id,
-          reason: reason || null
-        })
+      const result = await createExclusionAction({
+        userId: user1Id,
+        excludedUserId: user2Id,
+        reason: reason || undefined,
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
       alert('✅ Exclusión creada exitosamente')
@@ -91,14 +87,10 @@ export function ExclusionManager({ exclusionesIniciales, usuarios }: ExclusionMa
     }
 
     try {
-      const response = await fetch(`/api/exclusiones/${exclusionId}`, {
-        method: 'DELETE'
-      })
+      const result = await deleteExclusionAction(exclusionId)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
       alert('✅ Exclusión eliminada')

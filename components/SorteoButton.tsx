@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { runEventDrawAction } from '@/app/actions/event-participation'
+import { useToast } from '@/components/ToastProvider'
+
 interface SorteoButtonProps {
   eventId: number
   eventName: string
@@ -12,6 +15,7 @@ interface SorteoButtonProps {
 
 export function SorteoButton({ eventId, eventName, isDrawn, participantCount }: SorteoButtonProps) {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
@@ -34,20 +38,14 @@ export function SorteoButton({ eventId, eventName, isDrawn, participantCount }: 
     setError('')
 
     try {
-      const response = await fetch(`/api/eventos/${eventId}/sorteo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      const result = await runEventDrawAction(eventId)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al realizar el sorteo')
+      if (!result.success) {
+        throw new Error(result.error || 'Error al realizar el sorteo')
       }
 
-      alert(`✅ ¡Sorteo completado exitosamente!\n\n${data.assignments} asignaciones creadas.`)
+      const assignments = result.data?.assignments ?? 0
+      toast.success(`Sorteo completado (${assignments} asignaciones).`)
       router.refresh()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

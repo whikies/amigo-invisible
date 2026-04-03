@@ -52,7 +52,7 @@ export default async function Home() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4 bg-linear-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-            ⭐ Amigo Invisible Reyes Magos
+            ⭐ Amigo Invisible ⭐
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-2">
             Sistema de sorteo con asignaciones cifradas

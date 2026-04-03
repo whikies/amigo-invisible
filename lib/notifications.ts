@@ -123,7 +123,7 @@ async function sendNotificationEmail(
       return
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const appUrl = process.env.NEXTAUTH_URL
     const linkHtml = link ? `<p><a href="${appUrl}${link}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Ver en la aplicación</a></p>` : ''
 
     await emailTransporter.sendMail({
@@ -133,7 +133,7 @@ async function sendNotificationEmail(
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #1f2937; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
-            ⭐ Reyes Magos
+            ⭐ Amigo Invisible ⭐
           </h1>
           <h2 style="color: #3b82f6;">${title}</h2>
           <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">
@@ -145,7 +145,7 @@ async function sendNotificationEmail(
           ${linkHtml}
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #9ca3af; text-align: center;">
-            Este es un mensaje automático del sistema de Amigo Invisible Reyes Magos.
+            Este es un mensaje automático del sistema de Amigo Invisible.
           </p>
         </div>
       `

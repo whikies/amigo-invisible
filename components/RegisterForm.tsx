@@ -64,7 +64,7 @@ export function RegisterForm({ defaultEmail = '', defaultInvitationCode = '' }: 
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-linear-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-            Reyes Magos
+            Amigo Invisible
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Crea tu cuenta para participar en el sorteo

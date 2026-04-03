@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Amigo Invisible Reyes Magos",
+  title: "Amigo Invisible",
   description: "Sistema de sorteo de amigo invisible con asignaciones cifradas",
 };
 

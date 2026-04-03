@@ -6,16 +6,27 @@ interface EmailOptions {
   html: string
 }
 
-// Configurar el transportador de nodemailer
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT || '587'),
-  secure: process.env.EMAIL_SECURE === 'true', // true para puerto 465, false para otros
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-})
+function createTransporter() {
+  const host = process.env.EMAIL_HOST || 'localhost'
+  const port = Number.parseInt(process.env.EMAIL_PORT || '1025', 10)
+  const secure = process.env.EMAIL_SECURE === 'true'
+  const user = process.env.EMAIL_USER
+  const pass = process.env.EMAIL_PASSWORD
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    ...(user && pass
+      ? {
+          auth: {
+            user,
+            pass,
+          },
+        }
+      : {}),
+  })
+}
 
 /**
  * Envía un email
@@ -23,8 +34,16 @@ const transporter = nodemailer.createTransport({
  */
 export async function sendEmail(options: EmailOptions): Promise<void> {
   try {
+    const from = process.env.EMAIL_FROM
+
+    if (!from) {
+      throw new Error('EMAIL_FROM no esta configurado')
+    }
+
+    const transporter = createTransporter()
+
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM || '"Amigo Invisible" <noreply@amigosinvisible.com>',
+      from,
       to: options.to,
       subject: options.subject,
       html: options.html
@@ -42,6 +61,8 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
  */
 export async function verifyEmailConfig(): Promise<boolean> {
   try {
+    const transporter = createTransporter()
+
     await transporter.verify()
     console.log('✅ Configuración de email verificada')
     return true

@@ -115,7 +115,7 @@ function LoginForm() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-linear-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-            ⭐ Reyes Magos
+            ⭐ Amigo Invisible ⭐
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Inicia sesión en el sorteo de amigo invisible
@@ -246,15 +246,17 @@ function LoginForm() {
           </div>
 
           {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-2">
-              🔑 Credenciales de prueba:
-            </p>
-            <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
-              <p><strong>Admin:</strong> admin@reyes.com / admin123</p>
-              <p><strong>Usuario:</strong> cualquier usuario del seed / password123</p>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                🔑 Credenciales de prueba:
+              </p>
+              <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                <p><strong>Admin:</strong> admin@reyes.com / admin123</p>
+                <p><strong>Usuario:</strong> cualquier usuario del seed / password123</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Back to Home */}

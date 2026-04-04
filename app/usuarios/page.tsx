@@ -47,8 +47,7 @@ export default async function UsuariosPage() {
         {/* Info Box */}
         <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            <strong>📝 Modelo User:</strong> Cada usuario tiene email único, nombre, contraseña (hash bcrypt).
-            Puede participar en múltiples eventos y tener exclusiones con otros usuarios.
+            Cada usuario puede participar en múltiples eventos y tener exclusiones con otros usuarios.
           </p>
         </div>
 
@@ -108,7 +107,7 @@ export default async function UsuariosPage() {
         {users.length === 0 && (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400">
-              No hay usuarios registrados. Ejecuta <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">npm run seed</code>
+              No hay usuarios registrados.
             </p>
           </div>
         )}

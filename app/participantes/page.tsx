@@ -56,7 +56,6 @@ export default async function ParticipantesPage() {
         {/* Info Box */}
         <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            <strong>📝 Modelo EventParticipant:</strong> Vincula usuarios con eventos específicos.
             Un usuario puede participar en múltiples eventos, pero solo una vez por evento.
           </p>
         </div>
@@ -150,7 +149,7 @@ export default async function ParticipantesPage() {
         {events.length === 0 && (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400">
-              No hay eventos creados. Ejecuta <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">npm run seed</code>
+              No hay eventos creados.
             </p>
           </div>
         )}

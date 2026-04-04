@@ -53,7 +53,7 @@ export default async function ExclusionesPage() {
         {/* Info Box */}
         <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-            <strong>📝 Modelo UserExclusion:</strong> Define qué usuarios NO pueden ser asignados entre sí en el sorteo.
+            📝 Un exclusión define qué usuarios NO pueden ser asignados entre sí en el sorteo.
           </p>
           <p className="text-xs text-gray-600 dark:text-gray-400">
             ⚠️ Las exclusiones son <strong>bidireccionales</strong>: si A excluye a B, también B excluye a A.
@@ -122,7 +122,7 @@ export default async function ExclusionesPage() {
         {uniqueExclusions.length === 0 && (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400">
-              No hay exclusiones definidas. Ejecuta <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">npm run seed</code>
+              No hay exclusiones definidas.
             </p>
           </div>
         )}

@@ -61,7 +61,7 @@ export default async function AsignacionesPage() {
                 ⚠️ Sistema de Máxima Seguridad
               </h3>
               <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                <strong>📝 Modelo Assignment:</strong> Las asignaciones están <strong>cifradas con AES-256-GCM</strong>.
+                Las asignaciones están <strong>cifradas con AES-256-GCM</strong>.
                 Solo el usuario con su contraseña puede descifrar a quién le toca regalar.
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">

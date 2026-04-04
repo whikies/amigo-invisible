@@ -46,7 +46,7 @@ export default async function EventosPage() {
         {/* Info Box */}
         <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            <strong>📝 Modelo Event:</strong> Representa un sorteo específico (ej: Reyes 2026).
+            Un evento representa un sorteo específico (ej: Reyes 2026).
             Tiene nombre, fechas, estado de actividad y si ya se realizó el sorteo.
           </p>
         </div>
@@ -132,7 +132,7 @@ export default async function EventosPage() {
         {events.length === 0 && (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400">
-              No hay eventos creados. Ejecuta <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">npm run seed</code>
+              No hay eventos creados.
             </p>
           </div>
         )}

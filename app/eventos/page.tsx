@@ -47,7 +47,6 @@ export default async function EventosPage() {
         <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 dark:text-gray-300">
             Un evento representa un sorteo específico (ej: Reyes 2026).
-            Tiene nombre, fechas, estado de actividad y si ya se realizó el sorteo.
           </p>
         </div>
 

@@ -66,7 +66,6 @@ export default async function AsignacionesPage() {
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
                 🚫 Ni siquiera el administrador de la base de datos puede ver las asignaciones.
-                El campo <code>encryptedAssignedTo</code> contiene datos ilegibles sin la contraseña correcta.
               </p>
             </div>
           </div>
@@ -216,16 +215,6 @@ export default async function AsignacionesPage() {
               <p className="text-xs text-gray-500 dark:text-gray-400 ml-4">
                 La contraseña del usuario se convierte en una clave de 256 bits usando el salt único
               </p>
-            </div>
-
-            <div>
-              <strong className="text-gray-800 dark:text-gray-100">Componentes:</strong>
-              <ul className="text-xs text-gray-500 dark:text-gray-400 ml-4 mt-1 space-y-1">
-                <li>• <code>encryptedAssignedTo</code>: ID del usuario asignado (cifrado)</li>
-                <li>• <code>iv</code>: Vector de inicialización único (16 bytes)</li>
-                <li>• <code>salt</code>: Salt único para derivar la clave (32 bytes)</li>
-                <li>• <code>authTag</code>: Tag de autenticación GCM (detecta manipulaciones)</li>
-              </ul>
             </div>
 
             <div className="bg-green-50 dark:bg-green-900/20 rounded p-3 border border-green-200 dark:border-green-800">
